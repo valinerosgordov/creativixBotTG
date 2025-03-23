@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "1fh3QQSZutM=",
+  "dgSpecHash": "ODtCVHJPdvM=",
   "success": true,
-  "projectFilePath": "C:\\SideProjects\\BotCreativix\\BotCreativix.csproj",
+  "projectFilePath": "C:\\SideProjects\\creativixBotTG\\BotCreativix.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\mos26\\.nuget\\packages\\epplus\\7.6.0\\epplus.7.6.0.nupkg.sha512",
     "C:\\Users\\mos26\\.nuget\\packages\\epplus.interfaces\\7.5.0\\epplus.interfaces.7.5.0.nupkg.sha512",

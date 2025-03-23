@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("BotCreativix")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e6aff7d0d5d0e39a35b0b925bab6dfcff533b72a")]
 [assembly: System.Reflection.AssemblyProductAttribute("BotCreativix")]
 [assembly: System.Reflection.AssemblyTitleAttribute("BotCreativix")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

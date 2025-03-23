@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\SideProjects\\BotCreativix\\BotCreativix.csproj": {}
+    "C:\\SideProjects\\creativixBotTG\\BotCreativix.csproj": {}
   },
   "projects": {
-    "C:\\SideProjects\\BotCreativix\\BotCreativix.csproj": {
+    "C:\\SideProjects\\creativixBotTG\\BotCreativix.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\SideProjects\\BotCreativix\\BotCreativix.csproj",
+        "projectUniqueName": "C:\\SideProjects\\creativixBotTG\\BotCreativix.csproj",
         "projectName": "BotCreativix",
-        "projectPath": "C:\\SideProjects\\BotCreativix\\BotCreativix.csproj",
+        "projectPath": "C:\\SideProjects\\creativixBotTG\\BotCreativix.csproj",
         "packagesPath": "C:\\Users\\mos26\\.nuget\\packages\\",
-        "outputPath": "C:\\SideProjects\\BotCreativix\\obj\\",
+        "outputPath": "C:\\SideProjects\\creativixBotTG\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
