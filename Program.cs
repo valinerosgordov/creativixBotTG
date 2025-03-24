@@ -44,6 +44,19 @@ partial class Program
 
         await botClient.SendMessage(adminId, message, parseMode: ParseMode.Markdown);
     }
+    private static async Task TrySendMessage(long chatId, string message, IReplyMarkup? markup = null)
+{
+    try
+    {
+        await botClient.SendMessage(chatId, message, replyMarkup: markup);
+    }
+    catch (Exception ex)
+    {
+        string errorText = $"[{DateTime.Now}] ❌ Ошибка отправки сообщения: {ex.Message}\n{ex.StackTrace}";
+        System.IO.File.AppendAllText("error.log", errorText + "\n");
+        await botClient.SendMessage(adminId, $"❗️ *Ошибка отправки сообщения:*\n`{ex.Message}`", parseMode: ParseMode.Markdown);
+    }
+}
 
     static async Task Main(string[] args)
     {
@@ -268,7 +281,8 @@ partial class Program
                 await botClient.SendMessage(locChatId, msg, parseMode: ParseMode.Markdown);
             }
 
-            await botClient.SendMessage(chatId, "✅ Отчет отправлен! Спасибо, ты супер! 🌟");
+            await TrySendMessage(chatId, "✅ Отчёт готов!");
+
         }
         catch (Exception ex)
         {
