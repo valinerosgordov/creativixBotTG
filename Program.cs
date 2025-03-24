@@ -19,31 +19,41 @@ partial class Program
     private static readonly long adminId = 6947043193;
     private static readonly Dictionary<long, List<string>> userResponses = new();
     private static readonly Dictionary<string, long> LocationChatIds = new()
-    {
-        { "Грим Мск 1", -1002397750170 },
-        { "Грим Мск 0", -1002318856118 },
-        { "Грим Мск 3", -1002257906715 },
-        { "Авиапарк", -1002307194245 },
-        { "Фантазия", -1002475162608 },
-        { "МК Москва", -1002257906715 },
-        { "Аир Парк", -1002422847564 },
-        { "Луномосик", -1002495223375 },
-        { "Мультпарк", -1002413575599 }
-    };
+{
+    { "Грим Мск (0/1/3)", -1002397750170 }, // объединённый ID
+    { "МК Москва", -1002257906715 },
+    { "Авиапарк", -1002307194245 },
+    { "Фантазия", -1002475162608 },
+    { "Аир Парк", -1002422847564 },
+    { "Луномосик", -1002495223375 },
+    { "Мультпарк", -1002413575599 }
+};
+
 
     private static readonly object fileLock = new();
 
     private static async Task ReportError(Exception ex, long? chatId = null)
-    {
-        string errorText = $"[{DateTime.Now}] ❌ Ошибка: {ex.Message}\n{ex.StackTrace}\n";
-        System.IO.File.AppendAllText("error.log", errorText);
+{
+    string errorText = $"[{DateTime.Now}] ❌ Ошибка: {ex.Message}\n{ex.StackTrace}\n";
+    System.IO.File.AppendAllText("error.log", errorText);
 
+    try
+    {
         string message = $"🚨 *Ошибка в боте:*\n`{ex.Message}`";
         if (chatId != null)
             message += $"\n👤 Chat ID: `{chatId}`";
 
         await botClient.SendMessage(adminId, message, parseMode: ParseMode.Markdown);
     }
+    catch
+    {
+        // если даже отправка ошибки упала — молча
+    }
+}
+
+
+
+
     private static async Task TrySendMessage(long chatId, string message, IReplyMarkup? markup = null)
 {
     try
@@ -54,9 +64,18 @@ partial class Program
     {
         string errorText = $"[{DateTime.Now}] ❌ Ошибка отправки сообщения: {ex.Message}\n{ex.StackTrace}";
         System.IO.File.AppendAllText("error.log", errorText + "\n");
-        await botClient.SendMessage(adminId, $"❗️ *Ошибка отправки сообщения:*\n`{ex.Message}`", parseMode: ParseMode.Markdown);
+
+        try
+        {
+            await botClient.SendMessage(adminId, $"❗️ *Ошибка отправки сообщения:*\n`{ex.Message}`", parseMode: ParseMode.Markdown);
+        }
+        catch
+        {
+            // если отправка администратору не удалась — тоже молчим
+        }
     }
 }
+
 
     static async Task Main(string[] args)
     {
@@ -208,15 +227,10 @@ partial class Program
         {
             var keyboard = new InlineKeyboardMarkup(new[]
             {
-                new[] { InlineKeyboardButton.WithCallbackData("Грим Мск 1") },
-                new[] { InlineKeyboardButton.WithCallbackData("Грим Мск 0") },
-                new[] { InlineKeyboardButton.WithCallbackData("Грим Мск 3") },
-                new[] { InlineKeyboardButton.WithCallbackData("МК Москва") },
-                new[] { InlineKeyboardButton.WithCallbackData("Авиапарк") },
-                new[] { InlineKeyboardButton.WithCallbackData("Фантазия") },
-                new[] { InlineKeyboardButton.WithCallbackData("Аир Парк") },
-                new[] { InlineKeyboardButton.WithCallbackData("Луномосик") },
-                new[] { InlineKeyboardButton.WithCallbackData("Мультпарк") }
+                new[] { InlineKeyboardButton.WithCallbackData("Грим Мск (0/1/3)") },
+                new[] { InlineKeyboardButton.WithCallbackData("МК Москва"), InlineKeyboardButton.WithCallbackData("Авиапарк") },
+                new[] { InlineKeyboardButton.WithCallbackData("Фантазия"), InlineKeyboardButton.WithCallbackData("Аир Парк") },
+                new[] { InlineKeyboardButton.WithCallbackData("Луномосик"), InlineKeyboardButton.WithCallbackData("Мультпарк") }
             });
 
             await botClient.SendMessage(chatId, "📍 Выбери свое местоположение:", replyMarkup: keyboard);
