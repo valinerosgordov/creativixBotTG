@@ -13,7 +13,7 @@ using Telegram.Bot.Types.ReplyMarkups;
 
 partial class Program
 {
-    private static readonly string BotToken = "8051109468:AAGMEYtuxbcrUQ4lm6wLlEhwffuG_COX1Q8";
+    private static readonly string BotToken = "8051109468:AAHamj381V59fley_3yhSukuuzFW4W0nvPY";
     private static readonly ITelegramBotClient botClient = new TelegramBotClient(BotToken);
 
     private static readonly long adminId = 6947043193;
