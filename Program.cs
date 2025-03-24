@@ -13,24 +13,37 @@ using Telegram.Bot.Types.ReplyMarkups;
 
 partial class Program
 {
-    private static readonly string BotToken = "YOUR_BOT_TOKEN_HERE";
+    private static readonly string BotToken = "8051109468:AAGMEYtuxbcrUQ4lm6wLlEhwffuG_COX1Q8";
     private static readonly ITelegramBotClient botClient = new TelegramBotClient(BotToken);
 
+    private static readonly long adminId = 6947043193;
     private static readonly Dictionary<long, List<string>> userResponses = new();
     private static readonly Dictionary<string, long> LocationChatIds = new()
     {
         { "Грим Мск 1", -1002397750170 },
-        { "Грим Мск 0", -4633844539 },
-        { "Грим Мск 3", -4617470799 },
+        { "Грим Мск 0", -1002318856118 },
+        { "Грим Мск 3", -1002257906715 },
         { "Авиапарк", -1002307194245 },
-        { "Фантазия", -4783982885 },
-        { "МК Москва", -4654198477 },
-        { "Аир Парк", -4711552893 },
+        { "Фантазия", -1002475162608 },
+        { "МК Москва", -1002257906715 },
+        { "Аир Парк", -1002422847564 },
         { "Луномосик", -1002495223375 },
         { "Мультпарк", -1002413575599 }
     };
 
     private static readonly object fileLock = new();
+
+    private static async Task ReportError(Exception ex, long? chatId = null)
+    {
+        string errorText = $"[{DateTime.Now}] ❌ Ошибка: {ex.Message}\n{ex.StackTrace}\n";
+        System.IO.File.AppendAllText("error.log", errorText);
+
+        string message = $"🚨 *Ошибка в боте:*\n`{ex.Message}`";
+        if (chatId != null)
+            message += $"\n👤 Chat ID: `{chatId}`";
+
+        await botClient.SendMessage(adminId, message, parseMode: ParseMode.Markdown);
+    }
 
     static async Task Main(string[] args)
     {
@@ -49,184 +62,218 @@ partial class Program
 
     static async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, CancellationToken token)
     {
-        if (update.CallbackQuery is { } callback && callback.Message?.Chat?.Id is long callbackId)
+        try
         {
-            if (callback.Data == "redo")
+            if (update.CallbackQuery is { } callback && callback.Message?.Chat?.Id is long callbackId)
             {
-                userResponses[callbackId] = new List<string>();
-                await bot.SendTextMessageAsync(callbackId, "🔄 Давай начнём заново! Напиши своё имя, пожалуйста 😊");
-                return;
-            }
-
-            if (callback.Data == "submit")
-            {
-                var responses = userResponses[callbackId];
-                if (responses.Count < 10) return;
-
-                if (!decimal.TryParse(responses[2], out var revenue) ||
-                    !decimal.TryParse(responses[3], out var cash) ||
-                    !decimal.TryParse(responses[4], out var cashless) ||
-                    !decimal.TryParse(responses[5], out var sbp) ||
-                    !decimal.TryParse(responses[6], out var transfers) ||
-                    !decimal.TryParse(responses[7], out var extra) ||
-                    !decimal.TryParse(responses[8], out var exchange))
+                if (callback.Data == "redo")
                 {
-                    await bot.SendTextMessageAsync(callbackId, "❌ Ошибка при подтверждении: данные невалидны.");
+                    userResponses[callbackId] = new List<string>();
+                    await bot.SendMessage(callbackId, "🔄 Давай начнём заново! Напиши своё имя, пожалуйста 😊");
                     return;
                 }
 
-                decimal income = revenue - (cash + cashless + sbp + transfers + extra + exchange);
-                await SaveToExcelAndSendReport(callbackId, responses, revenue, cash, cashless, sbp, transfers, extra, exchange, income);
-                userResponses.Remove(callbackId);
+                if (callback.Data == "submit")
+                {
+                    var responses = userResponses[callbackId];
+                    if (responses.Count < 10) return;
+
+                    if (!decimal.TryParse(responses[2], out var revenue) ||
+                        !decimal.TryParse(responses[3], out var cash) ||
+                        !decimal.TryParse(responses[4], out var cashless) ||
+                        !decimal.TryParse(responses[5], out var sbp) ||
+                        !decimal.TryParse(responses[6], out var transfers) ||
+                        !decimal.TryParse(responses[7], out var extra) ||
+                        !decimal.TryParse(responses[8], out var exchange))
+                    {
+                        await bot.SendMessage(callbackId, "❌ Ошибка при подтверждении: данные невалидны.");
+                        return;
+                    }
+
+                    decimal income = revenue - (cash + cashless + sbp + transfers + extra + exchange);
+                    await SaveToExcelAndSendReport(callbackId, responses, revenue, cash, cashless, sbp, transfers, extra, exchange, income);
+                    userResponses.Remove(callbackId);
+                    return;
+                }
+
+                string? location = callback.Data;
+                if (string.IsNullOrEmpty(location)) return;
+
+                if (!userResponses.ContainsKey(callbackId))
+                    userResponses[callbackId] = new List<string>();
+
+                userResponses[callbackId].Add(location);
+                await bot.AnswerCallbackQuery(callback.Id);
+                await ProcessUserResponses(callbackId);
                 return;
             }
 
-            string? location = callback.Data;
-            if (string.IsNullOrEmpty(location)) return;
+            if (update.Message is not { } message || message.Text is not { } messageText || message.Chat?.Id is not long chatId)
+                return;
 
-            if (!userResponses.ContainsKey(callbackId))
-                userResponses[callbackId] = new List<string>();
+            var text = messageText.Trim();
+            Console.WriteLine($"📩 {chatId}: {text}");
 
-            userResponses[callbackId].Add(location);
-            await bot.AnswerCallbackQueryAsync(callback.Id);
-            await ProcessUserResponses(callbackId);
-            return;
+            if (text.ToLower() is "/reset" or "сброс")
+            {
+                userResponses[chatId] = new List<string>();
+                await bot.SendMessage(chatId, "🔄 Всё сбросили 🌸 Введи своё имя, милашка:");
+                return;
+            }
+
+            if (!userResponses.ContainsKey(chatId))
+            {
+                userResponses[chatId] = new List<string>();
+                await bot.SendMessage(chatId, "🌼 Привет, солнышко! Давай начнём с твоего имени 💕");
+                return;
+            }
+
+            userResponses[chatId].Add(text);
+            await ProcessUserResponses(chatId);
         }
-
-        if (update.Message is not { } message || message.Text is not { } messageText || message.Chat?.Id is not long chatId)
-            return;
-
-        var text = messageText.Trim();
-        Console.WriteLine($"📩 {chatId}: {text}");
-
-        if (text.ToLower() is "/reset" or "сброс")
+        catch (Exception ex)
         {
-            userResponses[chatId] = new List<string>();
-            await bot.SendTextMessageAsync(chatId, "🔄 Всё сбросили 🌸 Введи своё имя, милашка:");
-            return;
+            long? fallbackChatId = update.Message?.Chat?.Id ?? update.CallbackQuery?.Message?.Chat?.Id;
+            await ReportError(ex, fallbackChatId);
         }
-
-        if (!userResponses.ContainsKey(chatId))
-        {
-            userResponses[chatId] = new List<string>();
-            await bot.SendTextMessageAsync(chatId, "🌼 Привет, солнышко! Давай начнём с твоего имени 💕");
-            return;
-        }
-
-        userResponses[chatId].Add(text);
-        await ProcessUserResponses(chatId);
     }
     static async Task ProcessUserResponses(long chatId)
     {
-        if (!userResponses.TryGetValue(chatId, out var responses)) return;
-
-        string[] prompts =
+        try
         {
-            "📍 Выбери свое местоположение:",
-            "📊 Введи сумму выручки:",
-            "💵 Введи сумму наличных денег:",
-            "🏦 Введи сумму безналичного расчета:",
-            "🔄 Введи сумму по СБП:",
-            "🔁 Введи сумму переводов:",
-            "🧾 Введи сумму дополнительных трат:",
-            "💰 Введи сумму размена:",
-            "📝 Добавь комментарий (если нужно), или напиши любой символ, чтобы пропустить:"
-        };
+            if (!userResponses.TryGetValue(chatId, out var responses)) return;
 
-        if (responses.Count == 1)
-        {
-            await SendLocationSelection(chatId);
-            return;
-        }
-
-        if (responses.Count > 1 && responses.Count <= prompts.Length)
-        {
-            await botClient.SendTextMessageAsync(chatId, prompts[responses.Count - 1]);
-            return;
-        }
-
-        if (responses.Count == 10)
-        {
-            var confirmKeyboard = new InlineKeyboardMarkup(new[]
+            string[] prompts =
             {
-                new[] {
-                    InlineKeyboardButton.WithCallbackData("✅ Отправить отчёт", "submit"),
-                    InlineKeyboardButton.WithCallbackData("🔄 Переделать", "redo")
-                }
-            });
+                "📍 Выбери свое местоположение:",
+                "📊 Введи сумму выручки:",
+                "💵 Введи сумму наличных денег:",
+                "🏦 Введи сумму безналичного расчета:",
+                "🔄 Введи сумму по СБП:",
+                "🔁 Введи сумму переводов:",
+                "🧾 Введи сумму дополнительных трат:",
+                "💰 Введи сумму размена:",
+                "📝 Добавь комментарий (если нужно), или напиши любой символ, чтобы пропустить:"
+            };
 
-            await botClient.SendTextMessageAsync(chatId, "✨ Всё готово! Хочешь отправить отчёт или переделать? 😊", replyMarkup: confirmKeyboard);
-            return;
+            if (responses.Count == 1)
+            {
+                await SendLocationSelection(chatId);
+                return;
+            }
+
+            if (responses.Count > 1 && responses.Count <= prompts.Length)
+            {
+                await botClient.SendMessage(chatId, prompts[responses.Count - 1]);
+                return;
+            }
+
+            if (responses.Count == 10)
+            {
+                var confirmKeyboard = new InlineKeyboardMarkup(new[]
+                {
+                    new[]
+                    {
+                        InlineKeyboardButton.WithCallbackData("✅ Отправить отчёт", "submit"),
+                        InlineKeyboardButton.WithCallbackData("🔄 Переделать", "redo")
+                    }
+                });
+
+                await botClient.SendMessage(chatId, "✨ Всё готово! Хочешь отправить отчёт или переделать? 😊", replyMarkup: confirmKeyboard);
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            await ReportError(ex, chatId);
         }
     }
 
     static async Task SendLocationSelection(long chatId)
     {
-        var keyboard = new InlineKeyboardMarkup(new[]
+        try
         {
-            new[] { InlineKeyboardButton.WithCallbackData("Грим Мск 1"), InlineKeyboardButton.WithCallbackData("Грим Мск 0") },
-            new[] { InlineKeyboardButton.WithCallbackData("Грим Мск 3"), InlineKeyboardButton.WithCallbackData("Мультпарк") },
-            new[] { InlineKeyboardButton.WithCallbackData("Авиапарк"), InlineKeyboardButton.WithCallbackData("Фантазия") },
-            new[] { InlineKeyboardButton.WithCallbackData("МК Москва"), InlineKeyboardButton.WithCallbackData("Аир Парк") },
-            new[] { InlineKeyboardButton.WithCallbackData("Луномосик") }
-        });
+            var keyboard = new InlineKeyboardMarkup(new[]
+            {
+                new[] { InlineKeyboardButton.WithCallbackData("Грим Мск 1") },
+                new[] { InlineKeyboardButton.WithCallbackData("Грим Мск 0") },
+                new[] { InlineKeyboardButton.WithCallbackData("Грим Мск 3") },
+                new[] { InlineKeyboardButton.WithCallbackData("МК Москва") },
+                new[] { InlineKeyboardButton.WithCallbackData("Авиапарк") },
+                new[] { InlineKeyboardButton.WithCallbackData("Фантазия") },
+                new[] { InlineKeyboardButton.WithCallbackData("Аир Парк") },
+                new[] { InlineKeyboardButton.WithCallbackData("Луномосик") },
+                new[] { InlineKeyboardButton.WithCallbackData("Мультпарк") }
+            });
 
-        await botClient.SendTextMessageAsync(chatId, "📍 Выбери свое местоположение:", replyMarkup: keyboard);
+            await botClient.SendMessage(chatId, "📍 Выбери свое местоположение:", replyMarkup: keyboard);
+        }
+        catch (Exception ex)
+        {
+            await ReportError(ex, chatId);
+        }
     }
 
     static async Task SaveToExcelAndSendReport(long chatId, List<string> responses, decimal revenue, decimal cash, decimal cashless, decimal sbp, decimal transfers, decimal extra, decimal exchange, decimal income)
     {
-        string userName = responses[0];
-        string location = responses[1];
-        string comment = responses[9];
-        string fileName = $"{DateTime.Now:yyyy-MM-dd}_{userName}.xlsx";
-
-        lock (fileLock)
+        try
         {
-            using var package = new ExcelPackage(new FileInfo(fileName));
-            var sheet = package.Workbook.Worksheets.Count == 0
-                ? package.Workbook.Worksheets.Add("Daily Report")
-                : package.Workbook.Worksheets[0];
+            string userName = responses[0];
+            string location = responses[1];
+            string comment = responses[9];
+            string fileName = $"{DateTime.Now:yyyy-MM-dd}_{userName}.xlsx";
 
-            int row = (sheet.Dimension?.Rows ?? 0);
-            if (row == 0)
+            lock (fileLock)
             {
-                sheet.Cells[1, 1].Value = "Дата";
-                sheet.Cells[1, 2].Value = "Имя";
-                sheet.Cells[1, 3].Value = "Локация";
-                sheet.Cells[1, 4].Value = "Выручка";
-                row = 2;
+                using var package = new ExcelPackage(new FileInfo(fileName));
+                var sheet = package.Workbook.Worksheets.Count == 0
+                    ? package.Workbook.Worksheets.Add("Daily Report")
+                    : package.Workbook.Worksheets[0];
+
+                int row = (sheet.Dimension?.Rows ?? 0);
+                if (row == 0)
+                {
+                    sheet.Cells[1, 1].Value = "Дата";
+                    sheet.Cells[1, 2].Value = "Имя";
+                    sheet.Cells[1, 3].Value = "Локация";
+                    sheet.Cells[1, 4].Value = "Выручка";
+                    row = 2;
+                }
+                else row++;
+
+                sheet.Cells[row, 1].Value = DateTime.Now.ToString("yyyy-MM-dd");
+                sheet.Cells[row, 2].Value = userName;
+                sheet.Cells[row, 3].Value = location;
+                sheet.Cells[row, 4].Value = revenue;
+
+                sheet.Cells[sheet.Dimension.Address].AutoFitColumns();
+                package.Save();
             }
-            else row++;
 
-            sheet.Cells[row, 1].Value = DateTime.Now.ToString("yyyy-MM-dd");
-            sheet.Cells[row, 2].Value = userName;
-            sheet.Cells[row, 3].Value = location;
-            sheet.Cells[row, 4].Value = revenue;
+            if (!string.IsNullOrEmpty(location) && LocationChatIds.TryGetValue(location, out var locChatId))
+            {
+                string msg = $"🌸 *Твой милый отчёт готов, умничка!* 🌸\n" +
+                             $"📅 *Дата:* {DateTime.Now:yyyy-MM-dd}\n" +
+                             $"👩 *Имя:* {userName}\n" +
+                             $"📍 *Локация:* {location}\n" +
+                             $"💖 *Выручка:* {revenue} руб.\n" +
+                             $"💵 *Наличные:* {cash} руб.\n" +
+                             $"🏦 *Безнал:* {cashless} руб.\n" +
+                             $"💳 *СБП:* {sbp} руб.\n" +
+                             $"🔁 *Переводы:* {transfers} руб.\n" +
+                             $"🧾 *Доп. траты:* {extra} руб.\n" +
+                             $"💰 *Размен:* {exchange} руб.\n" +
+                             $"📜 *Комментарий:* {(string.IsNullOrWhiteSpace(comment) ? "-" : comment)}";
 
-            sheet.Cells[sheet.Dimension.Address].AutoFitColumns();
-            package.Save();
+                await botClient.SendMessage(locChatId, msg, parseMode: ParseMode.Markdown);
+            }
+
+            await botClient.SendMessage(chatId, "✅ Отчет отправлен! Спасибо, ты супер! 🌟");
         }
-
-        if (!string.IsNullOrEmpty(location) && LocationChatIds.TryGetValue(location, out var locChatId))
+        catch (Exception ex)
         {
-            string msg = $"🌸 *Твой милый отчёт готов, умничка!* 🌸\n" +
-                         $"📅 *Дата:* {DateTime.Now:yyyy-MM-dd}\n" +
-                         $"👩 *Имя:* {userName}\n" +
-                         $"📍 *Локация:* {location}\n" +
-                         $"💖 *Выручка:* {revenue} руб.\n" +
-                         $"💵 *Наличные:* {cash} руб.\n" +
-                         $"🏦 *Безнал:* {cashless} руб.\n" +
-                         $"💳 *СБП:* {sbp} руб.\n" +
-                         $"🔁 *Переводы:* {transfers} руб.\n" +
-                         $"🧾 *Доп. траты:* {extra} руб.\n" +
-                         $"💰 *Размен:* {exchange} руб.\n" +
-                         $"📜 *Комментарий:* {(string.IsNullOrWhiteSpace(comment) ? "-" : comment)}";
-
-            await botClient.SendTextMessageAsync(locChatId, msg, parseMode: ParseMode.Markdown);
+            await ReportError(ex, chatId);
         }
-
-        await botClient.SendTextMessageAsync(chatId, "✅ Отчет отправлен! Спасибо, ты супер! 🌟");
     }
 
     static Task HandleErrorAsync(ITelegramBotClient bot, Exception exception, CancellationToken token)
